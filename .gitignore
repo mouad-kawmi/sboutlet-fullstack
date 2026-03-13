@@ -1,0 +1,23 @@
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+
+# IDEs
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Sensitive data
+.env
+.env.local
+.env.*.local
+*.key
+
+# Dependencies and builds (handled in subfolders but good to have here too)
+node_modules/
+vendor/
+build/
+dist/
+storage/*.key
