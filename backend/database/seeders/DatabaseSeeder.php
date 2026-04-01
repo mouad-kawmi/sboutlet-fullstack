@@ -2,8 +2,10 @@
 
 namespace Database\Seeders;
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class DatabaseSeeder extends Seeder
 {
@@ -12,11 +14,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        \App\Models\User::create([
-            'name' => 'Admin SBOutlet',
-            'email' => 'admin@sboutlet.ma',
-            'password' => \Illuminate\Support\Facades\Hash::make('admin123'),
-            'role' => 'admin',
-        ]);
+        $adminEmail = env('SEED_ADMIN_EMAIL');
+        $adminPassword = env('SEED_ADMIN_PASSWORD');
+
+        if (!$adminEmail || !$adminPassword) {
+            $this->command?->warn(
+                'Admin seeding skipped. Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in .env if you want a local admin account.'
+            );
+
+            return;
+        }
+
+        User::updateOrCreate(
+            ['email' => $adminEmail],
+            [
+                'name' => env('SEED_ADMIN_NAME', 'Admin SBOutlet'),
+                'password' => Hash::make($adminPassword),
+                'role' => 'admin',
+            ]
+        );
+
+        $this->command?->info("Local admin account seeded for {$adminEmail}.");
     }
 }

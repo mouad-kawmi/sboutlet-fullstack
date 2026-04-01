@@ -51,6 +51,14 @@ php artisan serve
 
 The backend will be available at `http://127.0.0.1:8000`.
 
+If you want a local admin account, add these optional values to `backend/.env` before running `php artisan migrate --seed`:
+
+```env
+SEED_ADMIN_NAME=Local Admin
+SEED_ADMIN_EMAIL=your-admin@example.com
+SEED_ADMIN_PASSWORD=choose-a-strong-password
+```
+
 ### 2. Frontend
 
 ```bash
@@ -69,14 +77,11 @@ The frontend will be available at `http://localhost:3000`.
 
 Never commit real `.env` files, secrets, production tokens, or database dumps.
 
-## Default Seeded Admin
+## Optional Local Admin Seed
 
-The seeders create a default admin account for local development:
+The project no longer ships with public default admin credentials.
 
-- Email: `admin@sboutlet.ma`
-- Password: `admin123`
-
-Change this password immediately in any shared or deployed environment.
+If you want a local admin account, define `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in `backend/.env` before seeding the database.
 
 ## Security Notes
 

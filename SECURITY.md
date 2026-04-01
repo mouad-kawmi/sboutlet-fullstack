@@ -18,6 +18,6 @@ Instead:
 
 - Verify that `.env` files are not tracked
 - Remove local database dumps, tokens, and API keys
-- Review seeded credentials and change them outside local development
+- Keep any seeded admin credentials in local `.env` files only
 - Confirm CORS, auth, and file upload behavior are appropriate for the target environment
 - Do not reuse development secrets in production
