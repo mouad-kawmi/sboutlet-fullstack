@@ -1,82 +1,106 @@
-# SB Outlet - E-commerce Project
+# SB Outlet Fullstack
 
-Broad overview of the SB Outlet project. This repository contains both the frontend (React) and the backend (Laravel).
+SB Outlet is a fullstack e-commerce project built with a React frontend and a Laravel backend API.
 
-## 📁 Project Structure
+## Repository Structure
 
-- `sboutlet/`: Frontend application built with React.
-- `backendSboutlet/sboutletbackend/`: Backend API built with Laravel.
+- `sboutlet/`: React client application
+- `backend/`: Laravel API and business logic
 
----
+## Tech Stack
 
-## 🚀 Getting Started
+- Frontend: React, React Router, Axios
+- Backend: Laravel 10, Sanctum
+- Database: MySQL by default, SQLite supported for local setup
 
-### Prerequisites
+## Prerequisites
 
-- **Node.js** (v18 or higher)
-- **PHP** (v8.1 or higher)
-- **Composer**
-- **MySQL**
+- Node.js 18+
+- PHP 8.1+
+- Composer
+- One database option:
+  - MySQL for a production-like setup
+  - SQLite for a quick local setup
 
-### 1. Backend Setup (Laravel)
+## Quick Start
 
-1. Navigate to the backend directory:
-   ```bash
-   cd backendSboutlet/sboutletbackend
-   ```
-2. Install PHP dependencies:
-   ```bash
-   composer install
-   ```
-3. Setup environment variables:
-   ```bash
-   cp .env.example .env
-   # Update DB_DATABASE, DB_USERNAME, DB_PASSWORD in .env
-   ```
-4. Generate application key:
-   ```bash
-   php artisan key:generate
-   ```
-5. Run migrations:
-   ```bash
-   php artisan migrate
-   ```
-6. Start the backend server:
-   ```bash
-   php artisan serve
-   ```
+### 1. Backend
 
-### 2. Frontend Setup (React)
+```bash
+cd backend
+composer install
+copy .env.example .env
+php artisan key:generate
+```
 
-1. Navigate to the frontend directory:
-   ```bash
-   cd sboutlet
-   ```
-2. Install NPM dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm start
-   ```
+If you want the easiest local setup, switch the database in `.env` to SQLite:
 
----
+```env
+DB_CONNECTION=sqlite
+DB_DATABASE=database/database.sqlite
+```
 
-## 🛠️ Tech Stack
+Then create the database file and run migrations:
 
-- **Frontend**: React, Axios, React Router.
-- **Backend**: Laravel, MySQL, Sanctum (for Auth).
+```bash
+type nul > database\database.sqlite
+php artisan migrate --seed
+php artisan storage:link
+php artisan serve
+```
 
-## 👥 Team Collaboration
+The backend will be available at `http://127.0.0.1:8000`.
 
-To contribute to this project:
-1. Clone the repository.
-2. Create a new branch: `git checkout -b feature/your-feature-name`.
-3. Commit your changes: `git commit -m "Add some feature"`.
-4. Push to the branch: `git push origin feature/your-feature-name`.
-5. Open a Pull Request.
+### 2. Frontend
 
-## 📄 License
+```bash
+cd sboutlet
+copy .env.example .env
+npm install
+npm start
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The frontend will be available at `http://localhost:3000`.
+
+## Environment Files
+
+- Backend example: `backend/.env.example`
+- Frontend example: `sboutlet/.env.example`
+
+Never commit real `.env` files, secrets, production tokens, or database dumps.
+
+## Default Seeded Admin
+
+The seeders create a default admin account for local development:
+
+- Email: `admin@sboutlet.ma`
+- Password: `admin123`
+
+Change this password immediately in any shared or deployed environment.
+
+## Security Notes
+
+- `.env` files are ignored and should stay local only
+- Rotate any key or password if it was ever shared outside your machine
+- Review `SECURITY.md` before publishing or deploying
+
+## GitHub Workflow
+
+```bash
+git checkout -b feature/short-description
+git add .
+git commit -m "Describe the change"
+git push origin feature/short-description
+```
+
+For a direct publish on the main branch:
+
+```bash
+git add .
+git commit -m "Prepare repository for GitHub"
+git push origin master
+```
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE`.
