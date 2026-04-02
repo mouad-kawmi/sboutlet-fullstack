@@ -9,7 +9,7 @@ export const AdminProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     const normalizeProduct = (p) => {
-        const baseUrl = process.env.REACT_APP_IMAGE_URL || 'http://localhost:8000/storage';
+        const baseUrl = process.env.REACT_APP_IMAGE_URL || 'http://127.0.0.1:8000/storage';
 
         const fixPath = (path) => {
             if (!path) return '';
@@ -38,48 +38,40 @@ export const AdminProvider = ({ children }) => {
     const fetchData = async () => {
         setLoading(true);
 
-        // Fetch all products for storefront (price filters, etc.)
-        try {
-            // Use ?all=true to get everything for storefront logic
-            const productsRes = await api.get('/products?in_stock=true&all=true');
-            const normalizedProducts = productsRes.data.map(normalizeProduct);
-            setProducts(normalizedProducts);
-        } catch (error) {
-            console.error("Error fetching products:", error);
-        }
+        const p1 = api.get('/products?in_stock=true&all=true')
+            .then(res => setProducts(res.data.map(normalizeProduct)))
+            .catch(error => console.error("Error fetching products:", error));
 
-        // Fetch first page for Admin (so it's paginated by default)
-        try {
-            const paginateRes = await api.get('/products?in_stock=false'); // in_stock=false gets all? No, Laravel index filters in_stock=true by default. I should pass ?in_stock=false to see everything in Admin.
-            setPagination(paginateRes.data);
-        } catch (error) {
-            console.error("Error fetching paginated products:", error);
-        }
-
-        // Only try to fetch orders if we have a token (likely admin or logged user)
+        let p2 = Promise.resolve();
+        let p3 = Promise.resolve();
         const token = localStorage.getItem('sboutlet_token');
+        
         if (token) {
-            try {
-                const ordersRes = await api.get('/orders');
-                const normalizedOrders = ordersRes.data.map(o => ({
-                    ...o,
-                    customer: o.customer_name,
-                    phone: o.customer_phone,
-                    city: o.customer_city,
-                    address: o.customer_address,
-                    items: o.items.map(item => ({
-                        ...item,
-                        name: item.product?.name || 'Produit inconnu',
-                        qty: item.quantity,
-                        price: item.price
-                    }))
-                }));
-                setOrders(normalizedOrders);
-            } catch (error) {
-                console.error("Error fetching orders:", error);
-            }
+            p2 = api.get('/products?in_stock=false')
+                .then(res => setPagination(res.data))
+                .catch(error => console.error("Error fetching paginated products:", error));
+
+            p3 = api.get('/orders')
+                .then(res => {
+                    const normalizedOrders = res.data.map(o => ({
+                        ...o,
+                        customer: o.customer_name,
+                        phone: o.customer_phone,
+                        city: o.customer_city,
+                        address: o.customer_address,
+                        items: o.items.map(item => ({
+                            ...item,
+                            name: item.product?.name || 'Produit inconnu',
+                            qty: item.quantity,
+                            price: item.price
+                        }))
+                    }));
+                    setOrders(normalizedOrders);
+                })
+                .catch(error => console.error("Error fetching orders:", error));
         }
 
+        await Promise.all([p1, p2, p3]);
         setLoading(false);
     };
 
@@ -129,8 +121,9 @@ export const AdminProvider = ({ children }) => {
     const addProduct = async (formData) => {
         try {
             const response = await api.post('/products', formData);
-            setProducts(prev => [...prev, normalizeProduct(response.data)]);
-            return { success: true };
+            const created = normalizeProduct(response.data);
+            setProducts(prev => [created, ...prev]);
+            return { success: true, product: created };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Erreur lors de l\'ajout.' };
         }

@@ -48,17 +48,17 @@ class ProductController extends Controller
             'brand' => 'nullable|string',
             'name' => 'required|string',
             'description' => 'required|string',
-            'price' => 'required|numeric',
-            'old_price' => 'nullable|numeric',
-            'discount' => 'nullable|numeric',
+            'price' => 'required|numeric|min:0',
+            'old_price' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0|max:100',
             'category' => 'nullable|string',
             'condition_status' => 'nullable|string',
-            'stock' => 'nullable|integer',
+            'stock' => 'nullable|integer|min:0',
             'details' => 'nullable|string',
             'design' => 'nullable|string',
             'size' => 'nullable|string',
-            'main_image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'main_image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
             'images' => 'nullable|array',
         ]);
 
@@ -123,17 +123,17 @@ class ProductController extends Controller
             'brand' => 'nullable|string',
             'name' => 'sometimes|required|string',
             'description' => 'sometimes|required|string',
-            'price' => 'sometimes|required|numeric',
-            'old_price' => 'nullable|numeric',
-            'discount' => 'nullable|numeric',
+            'price' => 'sometimes|required|numeric|min:0',
+            'old_price' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0|max:100',
             'category' => 'nullable|string',
             'condition_status' => 'nullable|string',
-            'stock' => 'nullable|integer',
+            'stock' => 'nullable|integer|min:0',
             'details' => 'nullable|string',
             'design' => 'nullable|string',
             'size' => 'nullable|string',
-            'main_image' => 'sometimes|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'main_image' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
             'images' => 'nullable|array',
         ]);
 
@@ -221,4 +221,3 @@ class ProductController extends Controller
         return response()->json(['message' => 'Gallery image deleted successfully']);
     }
 }
-

@@ -12,14 +12,14 @@ return new class extends Migration {
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->string('brand', 100);
+            $table->string('brand', 100)->nullable();
             $table->string('name', 255);
             $table->text('description')->nullable();
             $table->decimal('price', 10, 2);
             $table->decimal('old_price', 10, 2)->nullable();
             $table->integer('discount')->default(0);
-            $table->string('category', 50); // Femme, Homme, Enfants, Accessoires
-            $table->string('condition_status', 50); // Neuf, Excellent état, etc.
+            $table->string('category', 50)->nullable();
+            $table->string('condition_status', 50)->nullable();
             $table->integer('stock')->default(1);
             $table->string('main_image', 500);
             $table->timestamps();

@@ -102,6 +102,15 @@ class OrderController extends Controller
         if (!$order) {
             return response()->json(['message' => 'Order not found'], 404);
         }
+
+        $user = request()->user();
+        $isAdmin = $user && $user->role === 'admin';
+        $isOwner = $user && $order->user_id === $user->id;
+
+        if (!$isAdmin && !$isOwner) {
+            return response()->json(['message' => 'Access denied.'], 403);
+        }
+
         return response()->json($order);
     }
 

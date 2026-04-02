@@ -4,6 +4,13 @@ import { useAdmin } from '../context/AdminContext';
 import { useAuth } from '../context/AuthContext';
 import Pagination from '../components/Pagination';
 
+const NON_NEGATIVE_FIELDS = {
+    price: { min: 0, step: '0.01', label: 'Prix (DH)' },
+    oldPrice: { min: 0, step: '0.01', label: 'Ancien Prix (DH)' },
+    discount: { min: 0, max: 100, step: '1', label: 'Reduction (%)' },
+    stock: { min: 0, step: '1', label: 'Stock' },
+};
+
 /* ── helpers ─────────────────────────────────────────────────── */
 const STATUS_COLORS = {
     'En attente': { bg: '#fef3c7', color: '#d97706', dot: '#f59e0b' },
@@ -140,11 +147,27 @@ const Dashboard = () => {
 };
 
 /* ── Product form modal ──────────────────────────────────────── */
-const ProductModal = ({ product = null, onClose }) => {
+const ProductModal = ({ product = null, onClose, afterSave }) => {
     const { addProduct, updateProduct } = useAdmin();
     const [form, setForm] = useState(product || EMPTY_PRODUCT);
 
-    const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+    const set = (k, v) => {
+        const rule = NON_NEGATIVE_FIELDS[k];
+
+        if (rule && v !== '') {
+            const numericValue = Number(v);
+
+            if (!Number.isNaN(numericValue)) {
+                if (numericValue < rule.min) {
+                    v = String(rule.min);
+                } else if (rule.max !== undefined && numericValue > rule.max) {
+                    v = String(rule.max);
+                }
+            }
+        }
+
+        setForm(f => ({ ...f, [k]: v }));
+    };
 
     const handleImageUpload = (e) => {
         const files = Array.from(e.target.files);
@@ -165,6 +188,26 @@ const ProductModal = ({ product = null, onClose }) => {
 
     const submit = async (e) => {
         e.preventDefault();
+
+        const invalidField = Object.entries(NON_NEGATIVE_FIELDS).find(([key, rule]) => {
+            const value = form[key];
+            if (value === '' || value === null || value === undefined) return false;
+
+            const numericValue = Number(value);
+            if (Number.isNaN(numericValue)) return false;
+            if (numericValue < rule.min) return true;
+            if (rule.max !== undefined && numericValue > rule.max) return true;
+
+            return false;
+        });
+
+        if (invalidField) {
+            const [, rule] = invalidField;
+            const maxMessage = rule.max !== undefined ? ` et au maximum ${rule.max}` : '';
+            alert(`${rule.label} doit etre au minimum ${rule.min}${maxMessage}.`);
+            return;
+        }
+
         const formData = new FormData();
 
         formData.append('name', form.name);
@@ -191,8 +234,10 @@ const ProductModal = ({ product = null, onClose }) => {
             ? await updateProduct(product.id, formData)
             : await addProduct(formData);
 
-        if (res.success) onClose();
-        else alert(res.error);
+        if (res.success) {
+            await afterSave?.(product ? 'update' : 'create');
+            onClose();
+        } else alert(res.error);
     };
 
     return (
@@ -221,8 +266,11 @@ const ProductModal = ({ product = null, onClose }) => {
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">{label}</label>
                                 <input
                                     type={type}
-                                    value={form[key] || ''}
+                                    value={form[key] ?? ''}
                                     onChange={e => set(key, e.target.value)}
+                                    min={NON_NEGATIVE_FIELDS[key]?.min}
+                                    max={NON_NEGATIVE_FIELDS[key]?.max}
+                                    step={NON_NEGATIVE_FIELDS[key]?.step}
                                     className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition"
                                     required={['name', 'price'].includes(key)}
                                 />
@@ -328,6 +376,11 @@ const Products = () => {
         fetchProductsPage(p, { category: catFilter, in_stock: 'false' });
     };
 
+    const handleProductSaved = async (mode) => {
+        const targetPage = mode === 'create' ? 1 : (pagination?.current_page || 1);
+        await fetchProductsPage(targetPage, { category: catFilter, in_stock: 'false' });
+    };
+
     // Keep some local search for minor tweaks if needed, but primary list comes from server
     const displayList = pagination?.data || [];
     const filtered = displayList.filter(p =>
@@ -336,7 +389,13 @@ const Products = () => {
 
     return (
         <div className="space-y-6">
-            {modal && <ProductModal product={modal === 'add' ? null : modal} onClose={() => setModal(null)} />}
+            {modal && (
+                <ProductModal
+                    product={modal === 'add' ? null : modal}
+                    onClose={() => setModal(null)}
+                    afterSave={handleProductSaved}
+                />
+            )}
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                 <div>
@@ -609,11 +668,15 @@ const PAGES = [
 ];
 
 const AdminPanel = () => {
-    const { stats } = useAdmin();
+    const { stats, refreshData } = useAdmin();
     const { currentUser, logout, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const [page, setPage] = useState('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    useEffect(() => {
+        refreshData();
+    }, []);
 
     // Wait for auth check to complete before redirecting
     if (authLoading) {
