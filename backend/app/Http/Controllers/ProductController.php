@@ -159,10 +159,15 @@ class ProductController extends Controller
 
         if ($request->hasFile('main_image')) {
             // Delete old main image if exists
-            if ($product->main_image) {
+            if ($product->main_image && !\Str::startsWith($product->main_image, 'http')) {
                 \Storage::disk('public')->delete($product->main_image);
             }
             $data['main_image'] = str_replace('\\', '/', $request->file('main_image')->store('products', 'public'));
+        } elseif ($request->main_image_clear === 'true') {
+            if ($product->main_image && !\Str::startsWith($product->main_image, 'http')) {
+                \Storage::disk('public')->delete($product->main_image);
+            }
+            $data['main_image'] = ''; // Or a placeholder
         }
 
         $product->update($data);

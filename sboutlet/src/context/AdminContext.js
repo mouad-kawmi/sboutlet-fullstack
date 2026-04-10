@@ -20,10 +20,10 @@ export const AdminProvider = ({ children }) => {
         return {
             ...p,
             image: fixPath(p.main_image),
-            images: p.images ? p.images.map(img => {
-                const url = typeof img === 'string' ? img : img.image_url;
-                return fixPath(url);
-            }) : [],
+            images: p.images ? p.images.map(img => ({
+                id: img.id,
+                url: fixPath(typeof img === 'string' ? img : img.image_url)
+            })) : [],
             condition: p.condition_status,
             oldPrice: p.old_price,
             details: p.details,
@@ -91,7 +91,6 @@ export const AdminProvider = ({ children }) => {
         return () => clearInterval(interval);
     }, []);
 
-    // Fetch orders only (lightweight refresh)
     const fetchOrdersOnly = async () => {
         const token = localStorage.getItem('sboutlet_token');
         if (!token) return;
@@ -117,7 +116,6 @@ export const AdminProvider = ({ children }) => {
         }
     };
 
-    // Products CRUD using FormData for Images
     const addProduct = async (formData) => {
         try {
             const response = await api.post('/products', formData);
@@ -131,7 +129,6 @@ export const AdminProvider = ({ children }) => {
 
     const updateProduct = async (id, formData) => {
         try {
-            // Laravel PUT with files sometimes needs _method: 'PUT' in a POST request
             formData.append('_method', 'PUT');
             const response = await api.post(`/products/${id}`, formData);
             const updated = normalizeProduct(response.data);
@@ -169,11 +166,19 @@ export const AdminProvider = ({ children }) => {
         }
     };
 
-    // Customer Place Order
+    const deleteGalleryImage = async (imageId) => {
+        try {
+            await api.delete(`/products/images/${imageId}`);
+            await fetchData(); // Heavy refresh to ensure all synced
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: 'Erreur lors de la suppression de l\'image.' };
+        }
+    };
+
     const placeOrder = async (orderData) => {
         try {
             const response = await api.post('/orders', orderData);
-            // If admin is logged in, append to orders list
             setOrders(prev => [response.data.order, ...prev]);
             return { success: true, order: response.data.order };
         } catch (error) {
@@ -181,11 +186,9 @@ export const AdminProvider = ({ children }) => {
         }
     };
 
-    // Paginated fetch for specific pages (Admin or Storefront)
     const fetchProductsPage = async (page = 1, extraParams = {}) => {
         try {
             const res = await api.get('/products', { params: { page, ...extraParams } });
-            // Normalize the data inside the pagination object
             const paginatedData = {
                 ...res.data,
                 data: res.data.data.map(normalizeProduct)
@@ -202,14 +205,13 @@ export const AdminProvider = ({ children }) => {
         try {
             const response = await api.patch(`/orders/${id}/status`, { status });
             setOrders(prev => prev.map(o => o.id === id ? { ...o, status: response.data.order.status } : o));
-            await fetchData(); // Refresh products to reflect stock changes
+            await fetchData();
             return { success: true };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Erreur lors de la mise à jour.' };
         }
     };
 
-    // Stats calculated from fetched data
     const stats = {
         totalRevenue: orders.filter(o => o.status === 'Livré').reduce((a, o) => a + Number(o.total), 0),
         pendingOrders: orders.filter(o => o.status === 'En attente').length,
@@ -233,7 +235,8 @@ export const AdminProvider = ({ children }) => {
             refreshData: fetchData,
             addProduct,
             updateProduct,
-            deleteProduct
+            deleteProduct,
+            deleteGalleryImage
         }}>
             {children}
         </AdminContext.Provider>

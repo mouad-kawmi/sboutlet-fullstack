@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAdmin } from '../context/AdminContext';
 import ProductCard from '../components/ProductCard';
+import api from '../api/axios';
 
 /* ── Condition badge config ────────────────────────────────── */
 const CONDITIONS = {
@@ -18,12 +19,66 @@ const ProductDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { addToCart } = useCart();
-    const { availableProducts } = useAdmin();
+    const { availableProducts, loading: contextLoading } = useAdmin();
+    
+    const [product, setProduct] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
-    // Find the product from the shared AdminContext database
-    const raw = availableProducts.find(p => String(p.id) === String(id));
+    useEffect(() => {
+        const findAndSetProduct = async () => {
+            setLoading(true);
+            // 1. Try to find in context
+            const found = availableProducts.find(p => String(p.id) === String(id));
+            
+            if (found) {
+                setProduct(found);
+                setLoading(false);
+            } else {
+                // 2. Fallback: Fetch directly from API
+                try {
+                    const response = await api.get(`/products/${id}`);
+                    // We need to normalize it since it's a raw piece of data from API
+                    const normalizeProduct = (p) => {
+                        const baseUrl = process.env.REACT_APP_IMAGE_URL || 'http://127.0.0.1:8000/storage';
+                        const fixPath = (path) => {
+                            if (!path) return '';
+                            if (path.startsWith('http')) return path;
+                            return `${baseUrl}/${path.replace(/\\/g, '/')}`;
+                        };
+                        return {
+                            ...p,
+                            image: fixPath(p.main_image),
+                            images: p.images ? p.images.map(img => ({
+                                id: img.id,
+                                url: fixPath(typeof img === 'string' ? img : img.image_url)
+                            })) : [],
+                            condition: p.condition_status,
+                            oldPrice: p.old_price,
+                        };
+                    };
+                    setProduct(normalizeProduct(response.data));
+                } catch (err) {
+                    console.error("Product not found:", err);
+                    setError(true);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
 
-    if (!raw) {
+        findAndSetProduct();
+    }, [id, availableProducts]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    if (error || !product) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center">
@@ -31,7 +86,7 @@ const ProductDetail = () => {
                 </div>
                 <div className="text-center">
                     <p className="text-slate-900 text-xl font-black uppercase tracking-tight mb-2">Pièce plus disponible</p>
-                    <p className="text-slate-500 text-sm max-w-xs mx-auto mb-8">Cet article a été vendu. Nos pièces sont uniques et partent très vite !</p>
+                    <p className="text-slate-500 text-sm max-w-xs mx-auto mb-8">Cet article a été vendu ou n'existe pas.</p>
                     <button onClick={() => navigate('/')} className="px-8 py-3 bg-primary text-white font-black uppercase text-xs tracking-widest rounded-xl shadow-lg shadow-primary/20">
                         Retour à la boutique
                     </button>
@@ -40,21 +95,25 @@ const ProductDetail = () => {
         );
     }
 
-    const hasDiscount = raw.discount && raw.discount > 0;
-    const finalPriceNum = hasDiscount ? raw.price * (1 - raw.discount / 100) : raw.price;
+    const hasDiscount = product.discount && product.discount > 0;
+    const finalPriceNum = hasDiscount ? product.price * (1 - product.discount / 100) : product.price;
 
-    // Normalize price strings
-    const product = {
-        ...raw,
-        price: fmt(finalPriceNum),
-        oldPrice: hasDiscount ? fmt(raw.price) : null,
-        rawPrice: finalPriceNum, // for adding to cart
-        ref: raw.ref || `REF-${String(raw.id).toUpperCase()}`,
-        year: raw.year || '2023',
-        description: raw.description || `${raw.name} — pièce de luxe d'occasion en ${raw.condition.toLowerCase()}. Authentifiée et nettoyée professionnellement par notre équipe SBOutlet.`,
-        images: (raw.images && raw.images.length > 0) ? raw.images : [raw.image],
-        conditionNote: raw.conditionNote || 'Vérifié et authentifié par notre équipe. Livré propre et prêt à porter.',
-        includes: raw.includes || [
+    // Gallery construction
+    const gallery = (Array.isArray(product.images) && product.images.length > 0) 
+        ? product.images 
+        : [product.image];
+
+    // Final normalized data for view
+    const viewData = {
+        ...product,
+        displayPrice: fmt(finalPriceNum),
+        displayOldPrice: hasDiscount ? fmt(product.price) : null,
+        rawPrice: finalPriceNum,
+        ref: product.ref || `REF-${String(product.id).toUpperCase()}`,
+        year: product.year || '2024',
+        images: gallery,
+        description: product.description || `${product.name} — pièce de luxe d'occasion. Authentifiée par SBOutlet.`,
+        includes: product.includes || [
             { icon: 'verified', text: 'Certificat d\'authenticité SBOutlet' },
             { icon: 'local_shipping', text: 'Livraison sécurisée partout au Maroc' },
             { icon: 'payments', text: '💳 Paiement à la livraison uniquement' },
@@ -63,19 +122,13 @@ const ProductDetail = () => {
     };
 
     const cond = CONDITIONS[product.condition] || CONDITIONS['Excellent État'];
-
-    const discount = product.discount && product.discount > 0 ? product.discount : null;
-
-    // Similar products: same category, exclude current
-    const similar = availableProducts
-        .filter(p => p.category === raw.category && p.id !== raw.id)
-        .slice(0, 4);
+    const similar = availableProducts.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
 
     return <DetailView
-        product={product}
-        raw={raw}
+        product={viewData}
+        raw={product}
         cond={cond}
-        discount={discount}
+        discount={product.discount > 0 ? product.discount : null}
         similar={similar}
         navigate={navigate}
         addToCart={addToCart}
@@ -110,43 +163,51 @@ const DetailView = ({ product, raw, cond, discount, similar, navigate, addToCart
 
                     {/* ── Gallery ── */}
                     <div className="lg:w-[55%] flex flex-col gap-6">
-                        <div className="relative rounded-[2.5rem] overflow-hidden bg-white shadow-xl ring-1 ring-slate-100" style={{ aspectRatio: '4/5' }}>
-                            <img
-                                key={activeImg}
-                                src={product.images[activeImg]}
-                                alt={product.name}
-                                className="w-full h-full object-cover select-none transition-all duration-700"
-                                style={{ animation: 'fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
-                            />
-                            {/* Badges Overlay */}
-                            <div className="absolute top-6 left-6 flex flex-col gap-3">
-                                <span className="bg-[#1e293b]/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 border border-white/10 w-max">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                    Pièce Unique
-                                </span>
-                                {discount && (
-                                    <span className="bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-full shadow-2xl w-max text-center border border-white/10">
-                                        -{discount}% OFF
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Thumbnails */}
-                        <div className="flex gap-4 overflow-x-auto pb-4 px-1 no-scrollbar">
-                            {product.images.map((img, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setActiveImg(i)}
-                                    className={`w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 rounded-[1.25rem] overflow-hidden bg-white shadow-md border-3 transition-all duration-300 transform ${activeImg === i
-                                        ? 'border-primary-600 scale-105 shadow-primary-200'
-                                        : 'border-transparent opacity-60 hover:opacity-100 hover:scale-102'
-                                        }`}
-                                >
-                                    <img src={img} alt={`vue ${i + 1}`} className="w-full h-full object-cover" />
-                                </button>
-                            ))}
-                        </div>
+                         <div className="relative rounded-[2.5rem] overflow-hidden bg-white shadow-xl ring-1 ring-slate-100" style={{ aspectRatio: '4/5' }}>
+                             <img
+                                 key={activeImg}
+                                 src={(product.images && product.images[activeImg]) ? product.images[activeImg].url : product.image}
+                                 alt={product.name}
+                                 className="w-full h-full object-cover select-none transition-all duration-700"
+                                 onError={(e) => {
+                                     if (e.target.src !== product.image) e.target.src = product.image;
+                                 }}
+                                 style={{ animation: 'fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
+                             />
+                             {/* Badges Overlay */}
+                             <div className="absolute top-6 left-6 flex flex-col gap-3">
+                                 <span className="bg-[#1e293b]/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 border border-white/10 w-max">
+                                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                     Pièce Unique
+                                 </span>
+                                 {discount && (
+                                     <span className="bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-full shadow-2xl w-max text-center border border-white/10">
+                                         -{discount}% OFF
+                                     </span>
+                                 )}
+                             </div>
+                         </div>
+ 
+                         {/* Thumbnails */}
+                         <div className="flex gap-4 overflow-x-auto pb-4 px-1 no-scrollbar">
+                             {product.images && product.images.length > 1 && product.images.map((imgObj, i) => (
+                                 <button
+                                     key={i}
+                                     onClick={() => setActiveImg(i)}
+                                     className={`w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 rounded-[1.25rem] overflow-hidden bg-white shadow-md border-3 transition-all duration-300 transform ${activeImg === i
+                                         ? 'border-primary-600 scale-105'
+                                         : 'border-transparent opacity-60 hover:opacity-100'
+                                         }`}
+                                 >
+                                     <img 
+                                         src={imgObj.url} 
+                                         alt={`vue ${i + 1}`} 
+                                         className="w-full h-full object-cover" 
+                                         onError={(e) => { e.target.src = product.image; }}
+                                     />
+                                 </button>
+                             ))}
+                         </div>
                     </div>
 
                     {/* ── Info ── */}
@@ -162,10 +223,10 @@ const DetailView = ({ product, raw, cond, discount, similar, navigate, addToCart
 
                         {/* Price */}
                         <div className="flex items-baseline gap-4 pb-6 border-b border-slate-200">
-                            <span className="text-3xl font-black text-primary-700 tracking-tight">{product.price}</span>
-                            {product.oldPrice && (
+                            <span className="text-3xl font-black text-primary-700 tracking-tight">{product.displayPrice}</span>
+                            {product.displayOldPrice && (
                                 <div className="flex flex-col">
-                                    <span className="text-sm text-slate-400 line-through">{product.oldPrice}</span>
+                                    <span className="text-sm text-slate-400 line-through">{product.displayOldPrice}</span>
                                     <span className="text-[10px] text-slate-400 font-semibold">Prix neuf estimé</span>
                                 </div>
                             )}
